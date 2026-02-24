@@ -1,0 +1,68 @@
+name: Deploy Addon
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'NoHablas/**'
+      - 'WOW_INTERFACE'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get version info
+        uses: dotnet/nbgv@master
+        id: nbgv
+
+      - name: Read WoW Interface version
+        id: interface
+        run: |
+          INTERFACE=$(tr -d '[:space:]' < WOW_INTERFACE)
+          echo "interface=$INTERFACE" >> $GITHUB_OUTPUT
+
+      - name: Prepare addon files
+        run: |
+          mkdir -p dist/NoHablas
+          cp NoHablas/*.lua dist/NoHablas/
+
+          cat > dist/NoHablas/NoHablas.toc <<EOF
+          ## Interface: ${{ steps.interface.outputs.interface }}
+          ## Title: NoHablas
+          ## Notes: Blocks PGF listings and applicants from LATAM realms.
+          ## Author: tolzy88
+          ## Version: ${{ steps.nbgv.outputs.SemVer2 }}
+
+          NoHablas.lua
+          EOF
+
+      - name: Create addon zip
+        run: |
+          cd dist
+          zip -r ../NoHablas-${{ steps.nbgv.outputs.SemVer2 }}.zip NoHablas
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.nbgv.outputs.SemVer2 }}" \
+            --title "NoHablas ${{ steps.nbgv.outputs.SemVer2 }}" \
+            --notes "Blocks PGF listings and applicants from LATAM realms." \
+            "NoHablas-${{ steps.nbgv.outputs.SemVer2 }}.zip"
