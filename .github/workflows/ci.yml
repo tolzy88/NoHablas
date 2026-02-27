@@ -6,7 +6,6 @@ on:
       - master
     paths:
       - 'NoHablas/**'
-      - 'WOW_INTERFACE'
   workflow_dispatch:
 
 permissions:
@@ -32,26 +31,14 @@ jobs:
         uses: dotnet/nbgv@master
         id: nbgv
 
-      - name: Read WoW Interface version
-        id: interface
-        run: |
-          INTERFACE=$(tr -d '[:space:]' < WOW_INTERFACE)
-          echo "interface=$INTERFACE" >> $GITHUB_OUTPUT
-
       - name: Prepare addon files
         run: |
           mkdir -p dist/NoHablas
-          cp NoHablas/*.lua dist/NoHablas/
+          cp -r NoHablas/* dist/NoHablas/
 
-          cat > dist/NoHablas/NoHablas.toc <<EOF
-          ## Interface: ${{ steps.interface.outputs.interface }}
-          ## Title: NoHablas
-          ## Notes: Blocks PGF listings and applicants from LATAM realms.
-          ## Author: tolzy88
-          ## Version: ${{ steps.nbgv.outputs.SemVer2 }}
+          TOC=dist/NoHablas/NoHablas.toc
 
-          NoHablas.lua
-          EOF
+          sed -i "s/^## Version:.*/## Version: ${{ steps.nbgv.outputs.SemVer2 }}/" "$TOC"
 
       - name: Create addon zip
         run: |
