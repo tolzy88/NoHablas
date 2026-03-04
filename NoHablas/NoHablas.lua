@@ -76,3 +76,5 @@ f:SetScript("OnEvent", function()
         end
     end
 end)
+
+print("NoHablas loaded.")
