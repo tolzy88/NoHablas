@@ -1,5 +1,6 @@
 -------------------------------------------------------------
 -- NoHablas - Realm-based Premade Group Finder filter
+-- By tolzy88
 -------------------------------------------------------------
 
 -- Hard block list (from realm list)
@@ -27,11 +28,11 @@ local function IsBlockedFullName(fullName)
 end
 
 ------------------------------------------------------------
--- 1) Hide Premade Group Finder listings from blocked realms
+-- 1) Hide group listings from blocked realms
 ------------------------------------------------------------
 local isRefreshingResults = false
 
-local function FilterSearchResultsByRealm(panel)
+local function FilterGroupsByRealm(panel)
     if isRefreshingResults then return end
 
     local results = panel and panel.results
@@ -58,7 +59,7 @@ local function FilterSearchResultsByRealm(panel)
 end
 
 ------------------------------------------------------------
--- 2) Hide applicants from blocked realms
+-- 2) Hide group applicants from blocked realms
 ------------------------------------------------------------
 local function FilterApplicantsByRealm(applicants)
     if not applicants then return end
@@ -66,26 +67,19 @@ local function FilterApplicantsByRealm(applicants)
     for idx = #applicants, 1, -1 do
         local applicantID = applicants[idx]
         local info = C_LFGList.GetApplicantInfo(applicantID)
-        local shouldHide = false
-        local filteredName
 
         if info and info.numMembers and info.numMembers > 0 then
             for memberIdx = 1, info.numMembers do
                 local name = C_LFGList.GetApplicantMemberInfo(applicantID, memberIdx)
                 if IsBlockedFullName(name) then
-                    shouldHide = true
-                    filteredName = name
+                    table.remove(applicants, idx)
                     break
                 end
             end
         end
-
-        if shouldHide then
-            table.remove(applicants, idx)
-        end
     end
 end
 
-hooksecurefunc("LFGListSearchPanel_UpdateResultList", FilterSearchResultsByRealm)
+hooksecurefunc("LFGListSearchPanel_UpdateResultList", FilterGroupsByRealm)
 hooksecurefunc("LFGListUtil_SortApplicants", FilterApplicantsByRealm)
 print("NoHablas loaded.")
