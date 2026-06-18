@@ -1,6 +1,6 @@
 -------------------------------------------------------------
 -- NoHablas - Realm-based Premade Group Finder filter
-------------------------------------------------------------
+-------------------------------------------------------------
 
 -- Hard block list (from realm list)
 local blockedRealms = {
@@ -28,10 +28,13 @@ end
 
 ------------------------------------------------------------
 -- 1) Hide Premade Group Finder listings from blocked realms
---    IMPORTANT: must hook UpdateResultList, not UpdateResults
 ------------------------------------------------------------
-hooksecurefunc("LFGListSearchPanel_UpdateResultList", function(panel)
-    local results = panel.results
+local isRefreshingResults = false
+
+local function FilterSearchResultsByRealm(panel)
+    if isRefreshingResults then return end
+
+    local results = panel and panel.results
     if not results then return end
 
     local filtered = {}
@@ -39,42 +42,50 @@ hooksecurefunc("LFGListSearchPanel_UpdateResultList", function(panel)
     for _, resultID in ipairs(results) do
         local info = C_LFGList.GetSearchResultInfo(resultID)
 
-        if info and info.leaderName then
-            if not IsBlockedFullName(info.leaderName) then
-                table.insert(filtered, resultID)
-            end
-        else
-            -- Fail-open: keep entries we can't safely inspect
+        if not (info and info.leaderName and IsBlockedFullName(info.leaderName)) then
             table.insert(filtered, resultID)
         end
     end
 
-    panel.results = filtered
-    panel.totalResults = #filtered
-end)
+    if #filtered ~= #results then
+        panel.results = filtered
+        panel.totalResults = #filtered
+
+        isRefreshingResults = true
+        LFGListSearchPanel_UpdateResults(panel)
+        isRefreshingResults = false
+    end
+end
 
 ------------------------------------------------------------
--- 2) Auto-decline applicants from blocked realms
+-- 2) Hide applicants from blocked realms
 ------------------------------------------------------------
-local f = CreateFrame("Frame")
-f:RegisterEvent("LFG_LIST_APPLICANT_UPDATED")
-f:RegisterEvent("LFG_LIST_APPLICANT_LIST_UPDATED")
-
-f:SetScript("OnEvent", function()
-    local applicants = C_LFGList.GetApplicants()
+local function FilterApplicantsByRealm(applicants)
     if not applicants then return end
 
-    for _, applicantID in ipairs(applicants) do
+    for idx = #applicants, 1, -1 do
+        local applicantID = applicants[idx]
         local info = C_LFGList.GetApplicantInfo(applicantID)
-        if info and info.applicationStatus == "applied" then
-            for _, member in ipairs(info.members or {}) do
-                if IsBlockedFullName(member.name) then
-                    C_LFGList.DeclineApplicant(applicantID)
+        local shouldHide = false
+        local filteredName
+
+        if info and info.numMembers and info.numMembers > 0 then
+            for memberIdx = 1, info.numMembers do
+                local name = C_LFGList.GetApplicantMemberInfo(applicantID, memberIdx)
+                if IsBlockedFullName(name) then
+                    shouldHide = true
+                    filteredName = name
                     break
                 end
             end
         end
-    end
-end)
 
+        if shouldHide then
+            table.remove(applicants, idx)
+        end
+    end
+end
+
+hooksecurefunc("LFGListSearchPanel_UpdateResultList", FilterSearchResultsByRealm)
+hooksecurefunc("LFGListUtil_SortApplicants", FilterApplicantsByRealm)
 print("NoHablas loaded.")
