@@ -31,6 +31,7 @@ end
 -- 1) Hide group listings from blocked realms
 ------------------------------------------------------------
 local isRefreshingResults = false
+local retryScheduled = false
 
 local function FilterGroupsByRealm(panel)
     if isRefreshingResults then return end
@@ -39,22 +40,38 @@ local function FilterGroupsByRealm(panel)
     if not results then return end
 
     local filtered = {}
+    local sawIncompleteData = false
 
     for _, resultID in ipairs(results) do
         local info = C_LFGList.GetSearchResultInfo(resultID)
 
-        if not (info and info.leaderName and IsBlockedFullName(info.leaderName)) then
+        if not info or not info.leaderName then
+            sawIncompleteData = true
+            table.insert(filtered, resultID)
+        elseif not IsBlockedFullName(info.leaderName) then
             table.insert(filtered, resultID)
         end
     end
 
     if #filtered ~= #results then
+        isRefreshingResults = true
         panel.results = filtered
         panel.totalResults = #filtered
-
-        isRefreshingResults = true
         LFGListSearchPanel_UpdateResults(panel)
         isRefreshingResults = false
+    end
+
+    if sawIncompleteData and not retryScheduled then
+        retryScheduled = true
+
+        C_Timer.After(0.25, function()
+            retryScheduled = false
+
+            local panel = LFGListFrame and LFGListFrame.SearchPanel
+            if panel then
+                FilterGroupsByRealm(panel)
+            end
+        end)
     end
 end
 
