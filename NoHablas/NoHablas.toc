@@ -1,4 +1,4 @@
-## Interface: 120007
+## Interface: 120100
 ## Title: NoHablas
 ## Notes: Blocks PGF listings and applicants from LATAM realms.
 ## Author: tolzy88
